@@ -158,17 +158,26 @@ jobs:
       APP_IMAGE: ghcr.io/ouzinehamza/agri-trials-app:${{ inputs.image_tag != '' && inputs.image_tag || needs.build.outputs.image_tag }}
       NGINX_IMAGE: ghcr.io/ouzinehamza/agri-trials-nginx:${{ inputs.image_tag != '' && inputs.image_tag || needs.build.outputs.image_tag }}
       DEPLOY_IMAGE: ghcr.io/ouzinehamza/agri-trials-deploy:${{ inputs.image_tag != '' && inputs.image_tag || needs.build.outputs.image_tag }}
+      VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
     steps:
       - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p "${VPS_SSH_PORT}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Check SSH and Docker access
+        run: |
+          ssh -p "${VPS_SSH_PORT}" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "docker version --format '{{.Server.Version}}'"
 
       - name: Create Docker SSH context
         run: |
-          docker context create vps --docker "host=ssh://${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          docker context create vps --docker "host=ssh://${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${VPS_SSH_PORT}"
 
       - name: Login Docker client to GHCR
         run: |
