@@ -1,0 +1,10 @@
+<?php
+namespace Database\Seeders;
+use App\Models\Trial; use Illuminate\Database\Seeder;
+class TrialSeeder extends Seeder{public function run():void{$trials=[
+['code'=>'P00017','variety'=>'CLX 7702','culture'=>'Melon','conduct'=>'Sous serre','status'=>'Décision','status_tone'=>'info','current_stage'=>'decision','supplier'=>'Clause','segment'=>'Melon / Charentais','owner'=>'Assma Benhammou','site'=>'Agadir','season'=>'2026','controls'=>['Magenta','Novitus','Avast']],
+['code'=>'P00002','variety'=>'CLX 7702','culture'=>'Melon','conduct'=>'Sous serre','status'=>'Évaluation','status_tone'=>'warning','current_stage'=>'evaluation','supplier'=>'Clause','segment'=>'Melon / Charentais','owner'=>'Assma Benhammou','site'=>'Agadir','season'=>'2026','controls'=>['Magenta','Novitus']],
+['code'=>'P00003','variety'=>'SYN 3391','culture'=>'Tomate','conduct'=>'Plein champ','status'=>'Greffage','status_tone'=>'neutral','current_stage'=>'greffage','supplier'=>'Syngenta','segment'=>'Tomate / Ronde','owner'=>'Laila Amrani','site'=>'Souss','season'=>'2026','controls'=>['Anasta F1']],
+['code'=>'P00001','variety'=>'RZ 24-118','culture'=>'Melon','conduct'=>'Sous serre','status'=>'Clôturé','status_tone'=>'success','current_stage'=>'cloture','supplier'=>'Rijk Zwaan','segment'=>'Melon / Galia','owner'=>'Assma Benhammou','site'=>'Agadir','season'=>'2025','controls'=>['Magenta']],
+['code'=>'P00007','variety'=>'NUN 8812','culture'=>'Melon','conduct'=>'Sous serre','status'=>'Semis','status_tone'=>'neutral','current_stage'=>'semis','supplier'=>'Nunhems (BASF)','segment'=>'Melon / Honeydew','owner'=>'Assma Benhammou','site'=>'Agadir','season'=>'2026','controls'=>['Magenta','Novitus','Avast']],
+['code'=>'P00016','variety'=>'NUN 8812','culture'=>'Melon','conduct'=>'Sous serre','status'=>'Création','status_tone'=>'neutral','current_stage'=>'creation','supplier'=>'Nunhems (BASF)','segment'=>'Melon / Honeydew','owner'=>'Assma Benhammou','site'=>'Agadir','season'=>'2026','controls'=>[]]];foreach($trials as$t)Trial::updateOrCreate(['code'=>$t['code']],$t);}}

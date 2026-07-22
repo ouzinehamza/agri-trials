@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+    --brand-primary: 29 158 117;
+    --brand-hover: 15 110 86;
+    --brand-fg: 255 255 255;
+    --accent: 55 138 221;
+    --page: 247 246 242;
+    --surface: 255 255 255;
+    --surface-2: 244 243 239;
+    --line: 224 222 214;
+    --ink: 28 32 30;
+    --ink-muted: 92 98 94;
+    --ink-faint: 140 146 142;
+    --success: 29 158 117;
+    --success-soft: 225 245 238;
+    --warning: 186 117 23;
+    --warning-soft: 250 238 218;
+    --danger: 194 45 45;
+    --danger-soft: 252 235 235;
+    --info: 24 95 165;
+    --info-soft: 230 241 251;
+    --font-sans: 'Figtree', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --radius: 10px;
+    --density: 1;
+}
+
+body {
+    background: rgb(var(--page));
+    color: rgb(var(--ink));
+    -webkit-font-smoothing: antialiased;
+}
+
+[dir='rtl'] body { font-family: Tahoma, Arial, var(--font-sans); }
+[dir='rtl'] .text-left { text-align: right; }
+[dir='rtl'] input[type='date'] { direction: rtl; }
+
+@media (max-width: 767px) {
+    button, a, input, select, textarea { min-height: 40px; }
+    input[type='checkbox'], input[type='radio'] { min-height: initial; }
+}
+
+* {
+    border-color: rgb(var(--line));
+}
+
+input[type='range'] {
+    accent-color: rgb(var(--brand-primary));
+}
+
+/* Smoothly reveal a label from an icon-only control (animatable, unlike width:auto). */
+.reveal-label {
+    display: inline-block;
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: max-width 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease, margin 0.28s ease;
+}
+.reveal-trigger:hover .reveal-label,
+.reveal-trigger:focus-visible .reveal-label,
+.reveal-trigger[data-active='true'] .reveal-label {
+    max-width: 10rem;
+    opacity: 1;
+}
+
+/* Skeleton shimmer. */
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    background: rgb(var(--surface-2));
+}
+.skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(var(--surface) / 0.6), transparent);
+    animation: shimmer 1.4s infinite;
+}
+
+/* Refined scrollbars for dense data views. */
+.scroll-slim::-webkit-scrollbar { height: 8px; width: 8px; }
+.scroll-slim::-webkit-scrollbar-thumb { background: rgb(var(--line)); border-radius: 9999px; }
+.scroll-slim::-webkit-scrollbar-track { background: transparent; }
+
+/* Respect users who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+}

@@ -1,0 +1,217 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Existing image tag/SHA to deploy instead of building the current commit"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ouzinehamza
+  APP_IMAGE_NAME: agri-trials-app
+  NGINX_IMAGE_NAME: agri-trials-nginx
+  DEPLOY_IMAGE_NAME: agri-trials-deploy
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.image_tag == '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: bcmath, exif, gd, intl, mbstring, pcntl, pdo_sqlite, redis, zip
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Prepare Laravel test environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+          touch database/database.sqlite
+          php artisan migrate --force
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Run Laravel tests
+        run: composer test
+
+  build:
+    name: Build, Push, Sign
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') && (github.event_name != 'workflow_dispatch' || inputs.image_tag == '') }}
+    outputs:
+      app_image: ${{ steps.images.outputs.app_image }}
+      nginx_image: ${{ steps.images.outputs.nginx_image }}
+      deploy_image: ${{ steps.images.outputs.deploy_image }}
+      image_tag: ${{ steps.images.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image names
+        id: images
+        run: |
+          TAG="${GITHUB_SHA}"
+          APP_IMAGE="${REGISTRY}/${IMAGE_NAMESPACE}/${APP_IMAGE_NAME}:${TAG}"
+          NGINX_IMAGE="${REGISTRY}/${IMAGE_NAMESPACE}/${NGINX_IMAGE_NAME}:${TAG}"
+          DEPLOY_IMAGE="${REGISTRY}/${IMAGE_NAMESPACE}/${DEPLOY_IMAGE_NAME}:${TAG}"
+          {
+            echo "image_tag=${TAG}"
+            echo "app_image=${APP_IMAGE}"
+            echo "nginx_image=${NGINX_IMAGE}"
+            echo "deploy_image=${DEPLOY_IMAGE}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile.production
+          push: true
+          tags: ${{ steps.images.outputs.app_image }}
+          provenance: true
+          sbom: true
+
+      - name: Build and push nginx image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/nginx/Dockerfile.production
+          push: true
+          tags: ${{ steps.images.outputs.nginx_image }}
+          provenance: true
+          sbom: true
+
+      - name: Build and push deployer image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/deploy/Dockerfile
+          push: true
+          tags: ${{ steps.images.outputs.deploy_image }}
+          provenance: true
+          sbom: true
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign images
+        env:
+          APP_IMAGE: ${{ steps.images.outputs.app_image }}
+          NGINX_IMAGE: ${{ steps.images.outputs.nginx_image }}
+          DEPLOY_IMAGE: ${{ steps.images.outputs.deploy_image }}
+        run: |
+          cosign sign --yes "${APP_IMAGE}"
+          cosign sign --yes "${NGINX_IMAGE}"
+          cosign sign --yes "${DEPLOY_IMAGE}"
+
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ always() && (needs.build.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.image_tag != '')) }}
+    environment:
+      name: Production
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag != '' && inputs.image_tag || needs.build.outputs.image_tag }}
+      APP_IMAGE: ghcr.io/ouzinehamza/agri-trials-app:${{ inputs.image_tag != '' && inputs.image_tag || needs.build.outputs.image_tag }}
+      NGINX_IMAGE: ghcr.io/ouzinehamza/agri-trials-nginx:${{ inputs.image_tag != '' && inputs.image_tag || needs.build.outputs.image_tag }}
+      DEPLOY_IMAGE: ghcr.io/ouzinehamza/agri-trials-deploy:${{ inputs.image_tag != '' && inputs.image_tag || needs.build.outputs.image_tag }}
+    steps:
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Create Docker SSH context
+        run: |
+          docker context create vps --docker "host=ssh://${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+
+      - name: Login Docker client to GHCR
+        run: |
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+
+      - name: Pull private release images on VPS
+        run: |
+          docker --context vps pull "${APP_IMAGE}"
+          docker --context vps pull "${NGINX_IMAGE}"
+          docker --context vps pull "${DEPLOY_IMAGE}"
+
+      - name: Run deployer
+        run: |
+          cat > deploy.env <<'EOF'
+          COMPOSE_PROJECT_NAME=agri-trials
+          APP_IMAGE=${{ env.APP_IMAGE }}
+          NGINX_IMAGE=${{ env.NGINX_IMAGE }}
+          APP_HOST=${{ vars.APP_HOST }}
+          APP_URL=${{ vars.APP_URL }}
+          TRAEFIK_NETWORK=${{ vars.TRAEFIK_NETWORK || 'gateway' }}
+          TRAEFIK_CERT_RESOLVER=${{ vars.TRAEFIK_CERT_RESOLVER || 'letsencrypt' }}
+          APP_NAME=${{ vars.APP_NAME || 'Agri-Trials' }}
+          APP_ENV=production
+          APP_DEBUG=false
+          APP_LOCALE=${{ vars.APP_LOCALE || 'fr' }}
+          APP_FALLBACK_LOCALE=${{ vars.APP_FALLBACK_LOCALE || 'fr' }}
+          CONTENT_LOCALES=${{ vars.CONTENT_LOCALES || 'fr,en' }}
+          DB_DATABASE=${{ vars.DB_DATABASE || 'agritrials' }}
+          DB_USERNAME=${{ vars.DB_USERNAME || 'agri' }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          MINIO_ROOT_USER=${{ vars.MINIO_ROOT_USER || 'agriadmin' }}
+          MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
+          MINIO_BUCKET=${{ vars.MINIO_BUCKET || 'agri-media' }}
+          MAIL_HOST=${{ vars.MAIL_HOST }}
+          MAIL_PORT=${{ vars.MAIL_PORT || '587' }}
+          MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+          MAIL_FROM_ADDRESS=${{ vars.MAIL_FROM_ADDRESS }}
+          APP_KEY=${{ secrets.APP_KEY }}
+          EOF
+          sed -i 's/^          //' deploy.env
+          docker --context vps run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            --env-file deploy.env \
+            "${DEPLOY_IMAGE}"
