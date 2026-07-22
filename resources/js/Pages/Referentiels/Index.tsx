@@ -122,8 +122,8 @@ export default function Index({ slug, label, tabs, fields, rows, display = {} }:
 
 function Modal({ title, onClose, width = 'max-w-lg', children }: { title: string; onClose: () => void; width?: string; children: React.ReactNode }) {
     return (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 sm:p-10">
-            <div className={cn('w-full rounded-xl border border-line bg-surface shadow-xl', width)}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 sm:p-10 animate-fade-in">
+            <div className={cn('w-full rounded-xl border border-line bg-surface shadow-xl animate-scale-in', width)}>
                 <div className="flex items-center justify-between border-b border-line px-5 py-4">
                     <h2 className="text-[17px] font-medium text-ink">{title}</h2>
                     <button onClick={onClose} className="text-ink-faint hover:text-ink" aria-label="Fermer"><X size={18} /></button>
