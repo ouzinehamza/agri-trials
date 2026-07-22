@@ -119,14 +119,14 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     // Show a page skeleton while navigating between full pages (not partial/deferred reloads or forms).
     const [loading, setLoading] = useState(false);
     useEffect(() => {
-        let timer: ReturnType<typeof setTimeout> | undefined;
         const off1 = router.on('start', (e) => {
             const v = e.detail.visit;
-            if (v.method === 'get' && v.only.length === 0) timer = setTimeout(() => setLoading(true), 150);
+            if (v.method === 'get' && v.only.length === 0) setLoading(true);
         });
-        const done = () => { clearTimeout(timer); setLoading(false); };
+        const done = () => setLoading(false);
         const off2 = router.on('finish', done);
-        return () => { off1(); off2(); clearTimeout(timer); };
+        const off3 = router.on('error', done);
+        return () => { off1(); off2(); off3(); };
     }, []);
     return (
         <div className="min-h-screen">
