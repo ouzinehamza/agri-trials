@@ -172,6 +172,8 @@ jobs:
       - name: Check SSH port reachability
         if: env.DEPLOY_TRANSPORT == 'ssh'
         run: |
+          RUNNER_IP="$(curl -fsS https://api.ipify.org || true)"
+          echo "GitHub runner public IP: ${RUNNER_IP:-unknown}"
           nc -vz -w 15 "${{ secrets.VPS_HOST }}" "${VPS_SSH_PORT}" \
             || { echo "Cannot reach VPS SSH port ${VPS_SSH_PORT} from this GitHub runner. Your local laptop can connect, so check provider firewall, server firewall, fail2ban/allowlists, or use DEPLOY_RUNNER=self-hosted with DEPLOY_TRANSPORT=local."; exit 1; }
 
