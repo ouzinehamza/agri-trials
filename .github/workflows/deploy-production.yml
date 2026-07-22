@@ -148,7 +148,7 @@ jobs:
 
   deploy:
     name: Deploy to VPS
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.DEPLOY_RUNNER || 'ubuntu-latest' }}
     needs: build
     if: ${{ always() && (needs.build.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.image_tag != '')) }}
     environment:
@@ -159,8 +159,10 @@ jobs:
       NGINX_IMAGE: ghcr.io/ouzinehamza/agri-trials-nginx:${{ inputs.image_tag != '' && inputs.image_tag || needs.build.outputs.image_tag }}
       DEPLOY_IMAGE: ghcr.io/ouzinehamza/agri-trials-deploy:${{ inputs.image_tag != '' && inputs.image_tag || needs.build.outputs.image_tag }}
       VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || '22' }}
+      DEPLOY_TRANSPORT: ${{ vars.DEPLOY_TRANSPORT || 'ssh' }}
     steps:
       - name: Install SSH key
+        if: env.DEPLOY_TRANSPORT == 'ssh'
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
@@ -168,11 +170,13 @@ jobs:
           ssh-keyscan -p "${VPS_SSH_PORT}" -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Check SSH port reachability
+        if: env.DEPLOY_TRANSPORT == 'ssh'
         run: |
-          timeout 15 bash -c "cat < /dev/null > /dev/tcp/${{ secrets.VPS_HOST }}/${VPS_SSH_PORT}" \
-            || { echo "Cannot reach VPS SSH port ${VPS_SSH_PORT}. Check VPS_SSH_PORT, provider firewall, and server firewall."; exit 1; }
+          nc -vz -w 15 "${{ secrets.VPS_HOST }}" "${VPS_SSH_PORT}" \
+            || { echo "Cannot reach VPS SSH port ${VPS_SSH_PORT} from this GitHub runner. Your local laptop can connect, so check provider firewall, server firewall, fail2ban/allowlists, or use DEPLOY_RUNNER=self-hosted with DEPLOY_TRANSPORT=local."; exit 1; }
 
       - name: Check SSH and Docker access
+        if: env.DEPLOY_TRANSPORT == 'ssh'
         run: |
           ssh -p "${VPS_SSH_PORT}" \
             -o BatchMode=yes \
@@ -181,6 +185,7 @@ jobs:
             "docker version --format '{{.Server.Version}}'"
 
       - name: Create Docker SSH context
+        if: env.DEPLOY_TRANSPORT == 'ssh'
         run: |
           docker context create vps --docker "host=ssh://${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${VPS_SSH_PORT}"
 
@@ -188,13 +193,21 @@ jobs:
         run: |
           printf '%s' "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
 
-      - name: Pull private release images on VPS
+      - name: Pull private release images on VPS over SSH
+        if: env.DEPLOY_TRANSPORT == 'ssh'
         run: |
           docker --context vps pull "${APP_IMAGE}"
           docker --context vps pull "${NGINX_IMAGE}"
           docker --context vps pull "${DEPLOY_IMAGE}"
 
-      - name: Run deployer
+      - name: Pull private release images locally
+        if: env.DEPLOY_TRANSPORT == 'local'
+        run: |
+          docker pull "${APP_IMAGE}"
+          docker pull "${NGINX_IMAGE}"
+          docker pull "${DEPLOY_IMAGE}"
+
+      - name: Write deploy environment
         run: |
           cat > deploy.env <<'EOF'
           COMPOSE_PROJECT_NAME=agri-trials
@@ -225,7 +238,19 @@ jobs:
           APP_KEY=${{ secrets.APP_KEY }}
           EOF
           sed -i 's/^          //' deploy.env
+
+      - name: Run deployer over SSH Docker context
+        if: env.DEPLOY_TRANSPORT == 'ssh'
+        run: |
           docker --context vps run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            --env-file deploy.env \
+            "${DEPLOY_IMAGE}"
+
+      - name: Run deployer locally
+        if: env.DEPLOY_TRANSPORT == 'local'
+        run: |
+          docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             --env-file deploy.env \
             "${DEPLOY_IMAGE}"
