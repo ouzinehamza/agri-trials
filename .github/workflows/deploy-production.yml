@@ -161,6 +161,18 @@ jobs:
       VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || '22' }}
       DEPLOY_TRANSPORT: ${{ vars.DEPLOY_TRANSPORT || 'ssh' }}
     steps:
+      - name: Validate deploy transport configuration
+        run: |
+          echo "DEPLOY_TRANSPORT=${DEPLOY_TRANSPORT}"
+          echo "RUNNER_ENVIRONMENT=${{ runner.environment }}"
+          if [ "${DEPLOY_TRANSPORT}" = "local" ] && [ "${{ runner.environment }}" != "self-hosted" ]; then
+            echo "DEPLOY_TRANSPORT=local must run on a self-hosted runner. Set Production variable DEPLOY_RUNNER=self-hosted."
+            exit 1
+          fi
+          if [ "${DEPLOY_TRANSPORT}" = "ssh" ] && [ "${{ runner.environment }}" = "self-hosted" ]; then
+            echo "DEPLOY_TRANSPORT=ssh is running on a self-hosted runner; this is allowed but unusual."
+          fi
+
       - name: Install SSH key
         if: env.DEPLOY_TRANSPORT == 'ssh'
         run: |
