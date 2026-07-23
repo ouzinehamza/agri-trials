@@ -173,6 +173,42 @@ jobs:
             echo "DEPLOY_TRANSPORT=ssh is running on a self-hosted runner; this is allowed but unusual."
           fi
 
+      - name: Validate production configuration
+        env:
+          APP_HOST: ${{ vars.APP_HOST }}
+          APP_URL: ${{ vars.APP_URL }}
+          MAIL_HOST: ${{ vars.MAIL_HOST }}
+          MAIL_FROM_ADDRESS: ${{ vars.MAIL_FROM_ADDRESS }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        run: |
+          missing=0
+          for name in \
+            APP_HOST \
+            APP_URL \
+            MAIL_HOST \
+            MAIL_FROM_ADDRESS \
+            APP_KEY \
+            DB_PASSWORD \
+            REDIS_PASSWORD \
+            MINIO_ROOT_PASSWORD \
+            MAIL_USERNAME \
+            MAIL_PASSWORD
+          do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing Production configuration: ${name}"
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            echo "Add the missing names above in GitHub Settings -> Environments -> Production."
+            exit 1
+          fi
+
       - name: Install SSH key
         if: env.DEPLOY_TRANSPORT == 'ssh'
         run: |
