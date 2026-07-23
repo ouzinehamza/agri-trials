@@ -257,6 +257,8 @@ jobs:
           NGINX_IMAGE=${{ env.NGINX_IMAGE }}
           APP_HOST=${{ vars.APP_HOST }}
           APP_URL=${{ vars.APP_URL }}
+          ASSET_URL=${{ vars.ASSET_URL || vars.APP_URL }}
+          TRUSTED_PROXIES=${{ vars.TRUSTED_PROXIES || '*' }}
           TRAEFIK_NETWORK=${{ vars.TRAEFIK_NETWORK || 'gateway' }}
           TRAEFIK_CERT_RESOLVER=${{ vars.TRAEFIK_CERT_RESOLVER || 'letsencrypt' }}
           APP_NAME=${{ vars.APP_NAME || 'Agri-Trials' }}
