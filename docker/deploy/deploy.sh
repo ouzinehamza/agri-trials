@@ -10,10 +10,6 @@ required=(
   DB_PASSWORD
   REDIS_PASSWORD
   MINIO_ROOT_PASSWORD
-  MAIL_HOST
-  MAIL_USERNAME
-  MAIL_PASSWORD
-  MAIL_FROM_ADDRESS
 )
 
 for name in "${required[@]}"; do

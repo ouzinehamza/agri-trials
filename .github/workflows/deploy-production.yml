@@ -177,27 +177,19 @@ jobs:
         env:
           APP_HOST: ${{ vars.APP_HOST }}
           APP_URL: ${{ vars.APP_URL }}
-          MAIL_HOST: ${{ vars.MAIL_HOST }}
-          MAIL_FROM_ADDRESS: ${{ vars.MAIL_FROM_ADDRESS }}
           APP_KEY: ${{ secrets.APP_KEY }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           MINIO_ROOT_PASSWORD: ${{ secrets.MINIO_ROOT_PASSWORD }}
-          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
-          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
         run: |
           missing=0
           for name in \
             APP_HOST \
             APP_URL \
-            MAIL_HOST \
-            MAIL_FROM_ADDRESS \
             APP_KEY \
             DB_PASSWORD \
             REDIS_PASSWORD \
-            MINIO_ROOT_PASSWORD \
-            MAIL_USERNAME \
-            MAIL_PASSWORD
+            MINIO_ROOT_PASSWORD
           do
             if [ -z "${!name:-}" ]; then
               echo "Missing Production configuration: ${name}"
@@ -280,11 +272,12 @@ jobs:
           MINIO_ROOT_USER=${{ vars.MINIO_ROOT_USER || 'agriadmin' }}
           MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
           MINIO_BUCKET=${{ vars.MINIO_BUCKET || 'agri-media' }}
-          MAIL_HOST=${{ vars.MAIL_HOST }}
+          MAIL_MAILER=${{ vars.MAIL_MAILER || 'log' }}
+          MAIL_HOST=${{ vars.MAIL_HOST || 'localhost' }}
           MAIL_PORT=${{ vars.MAIL_PORT || '587' }}
-          MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
-          MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
-          MAIL_FROM_ADDRESS=${{ vars.MAIL_FROM_ADDRESS }}
+          MAIL_USERNAME=${{ secrets.MAIL_USERNAME || '' }}
+          MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD || '' }}
+          MAIL_FROM_ADDRESS=${{ vars.MAIL_FROM_ADDRESS || 'noreply@agri-trials.local' }}
           APP_KEY=${{ secrets.APP_KEY }}
           EOF
           sed -i 's/^          //' deploy.env
