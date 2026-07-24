@@ -15,7 +15,7 @@ docker compose up -d --build          # app, web, db, redis, queue (+ vite)
 docker compose exec app php artisan migrate    # once, sets up the schema
 npm install && npm run build          # build Inertia assets (needs local Node 22)
 ```
-Open **http://localhost:8088** → register at `/register`, then `/dashboard`.
+Open **http://localhost:8006** → sign in at `/login`, then open `/dashboard`.
 
 ### Frontend dev (HMR)
 ```bash
@@ -26,9 +26,9 @@ docker compose up -d vite             # Vite dev server on :5173 with hot reload
 ## Ports
 | Service | URL |
 |---|---|
-| App (nginx) | http://localhost:8088 |
+| App (nginx) | http://localhost:8006 |
 | Vite HMR | http://localhost:5173 |
-| PostgreSQL | localhost:5433 (db `agritrials`, user `agri`) |
+| PostgreSQL | localhost:5434 (db `agritrials`, user `agri`) |
 
 ## Layout
 - `app/`, `resources/js/`, `routes/`, `database/` — the Laravel + Inertia app

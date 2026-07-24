@@ -1,6 +1,7 @@
 <?php
 namespace Tests\Feature;
 
+use App\Domain\Metadata\MetadataService;
 use App\Models\{FieldDefinition, Supplier, User, Variety};
 use Database\Seeders\FieldDefinitionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -73,5 +74,24 @@ class MetadataFieldsTest extends TestCase
 
         $this->actingAs($user)->post('/referentiels/fournisseurs', ['name' => 'Green Fields Ltd'])->assertRedirect();
         $this->assertSame('green-fields-ltd', Supplier::where('name', 'Green Fields Ltd')->first()->custom_data['handle']);
+    }
+
+    public function test_legacy_reference_labels_do_not_break_referential_display(): void
+    {
+        $field = FieldDefinition::create([
+            'model_type' => 'variety',
+            'key' => 'suppliers',
+            'label' => 'Fournisseurs',
+            'type' => 'multiselect',
+            'settings' => ['option_source' => 'entity', 'reference_model' => 'supplier'],
+        ]);
+        $variety = Variety::create([
+            'name' => 'Legacy variety',
+            'custom_data' => ['suppliers' => ['Syngenta', 'Clause']],
+        ]);
+
+        $display = MetadataService::displayMap(collect([$variety]), collect([$field]));
+
+        $this->assertSame('Syngenta, Clause', $display[$variety->id]['suppliers']);
     }
 }

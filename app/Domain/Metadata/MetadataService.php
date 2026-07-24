@@ -203,7 +203,12 @@ class MetadataService
     public static function labelsFor(string $modelType, array $ids): array
     {
         $class = Referentiels::modelClassFor($modelType);
-        $ids = array_values(array_filter($ids, fn ($id) => $id !== null && $id !== ''));
+        // Reference fields created after records already exist can temporarily contain legacy
+        // human-readable labels. Never send those labels to an integer primary-key query.
+        $ids = array_values(array_filter(
+            $ids,
+            fn ($id) => $id !== null && $id !== '' && (is_int($id) || ctype_digit((string) $id)),
+        ));
         if (! $class || empty($ids)) {
             return [];
         }
@@ -295,7 +300,15 @@ class MetadataService
             $rowLabels = [];
             foreach ($refFields as $f) {
                 $val = $f->is_system ? ($row->{$f->key} ?? null) : (($row->custom_data ?? [])[$f->key] ?? null);
-                $resolved = array_map(fn ($id) => $labels[$f->key][$id] ?? ('#'.$id), array_filter((array) $val, fn ($v) => $v !== null && $v !== ''));
+                $resolved = array_map(function ($id) use ($labels, $f) {
+                    if (isset($labels[$f->key][$id])) {
+                        return $labels[$f->key][$id];
+                    }
+
+                    // Keep pre-migration labels readable. Only unresolved numeric references use
+                    // the diagnostic "#id" form.
+                    return (is_int($id) || ctype_digit((string) $id)) ? '#'.$id : (string) $id;
+                }, array_filter((array) $val, fn ($v) => $v !== null && $v !== ''));
                 $rowLabels[$f->key] = implode(', ', $resolved);
             }
             $map[$row->getKey()] = $rowLabels;
