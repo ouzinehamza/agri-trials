@@ -21,8 +21,8 @@ class RegisteredUserController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('404');
-        //return Inertia::render('Auth/Register');
+        //return Inertia::render('403');
+        return Inertia::render('Auth/Register');
     }
 
     /**
@@ -49,6 +49,6 @@ class RegisteredUserController extends Controller
         Auth::login($user);
 
         return redirect(route('dashboard', absolute: false));*/
-        return redirect(url('/'))->with('message', 'Register is diabled, new users must be invited within the system');
+        return redirect(url('/'))->with('error', 'Register is diabled, new users must be invited within the system');
     }
 }
